@@ -1,2 +1,2 @@
 # pcap
-pcap --- go implementation for PCAP parser
+pcap --- go implementation for PCAP file parser
