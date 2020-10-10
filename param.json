@@ -1,0 +1,11 @@
+{
+    "disable.pcap": ["MagicNumber", "Version", "Network"],
+    "DISABLE.record": ["TS", "InclLen"],
+    "disable.ether": ["Src", "Dst", "Len"],
+    "disable.ip": ["Src", "Dst", "Protocol"],
+    "ip": ["Src", "Dst"],
+    "disable.tcp": ["Src", "Dst", "SeqNo", "AckNo", "DataOffset", "Options", "URG", "SYN", "ACK", "PSH", "FIN", "RST"],
+    "tcp": ["Src", "Dst", "SeqNo", "AckNo", "SYN", "ACK", "Payload"],
+    "udp": ["Src", "Dst"],
+    "icmp": ["Type", "Code", "Identifier", "Sequence", "Payload"]
+}
