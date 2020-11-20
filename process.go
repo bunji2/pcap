@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"./arp"
 	"./ether"
 	"./icmp"
 	"./ip"
@@ -50,13 +51,15 @@ func processEther(h ether.Header, payload []byte, recNo int) (err error) {
 		var value string
 		switch tag {
 		case "Src":
-			value = fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X",
-				h.Src[0], h.Src[1], h.Src[2], h.Src[3], h.Src[4], h.Src[5])
+			//value = fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X",
+			//	h.Src[0], h.Src[1], h.Src[2], h.Src[3], h.Src[4], h.Src[5])
+			value = macString(h.Src[:])
 		case "Dst":
-			value = fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X",
-				h.Dst[0], h.Dst[1], h.Dst[2], h.Dst[3], h.Dst[4], h.Dst[5])
-		case "Len":
-			value = fmt.Sprintf("%d", h.Len)
+			value = macString(h.Dst[:])
+			//value = fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X",
+			//	h.Dst[0], h.Dst[1], h.Dst[2], h.Dst[3], h.Dst[4], h.Dst[5])
+		case "Type":
+			value = fmt.Sprintf("%d", h.Type)
 		}
 		fmt.Printf("%d.Ether.%s=%s\n", recNo, tag, value)
 	}
@@ -82,13 +85,17 @@ func processIP(h ip.Header, payload []byte, recNo int) (err error) {
 		case "HeaderChecksum":
 			value = fmt.Sprintf("%d", h.HeaderChecksum)
 		case "Version":
-			value = fmt.Sprintf("%d", h.Ver())
+			value = fmt.Sprintf("%d", h.Version)
 		case "HeaderLen":
-			value = fmt.Sprintf("%d", h.HLen())
+			value = fmt.Sprintf("%d", h.HeaderLen)
+		case "OptionField":
+			value = hex(h.OptionField)
 		case "Src":
-			value = fmt.Sprintf("%d.%d.%d.%d", h.Src[0], h.Src[1], h.Src[2], h.Src[3])
+			//value = fmt.Sprintf("%d.%d.%d.%d", h.Src[0], h.Src[1], h.Src[2], h.Src[3])
+			value = ipv4String(h.Src[:])
 		case "Dst":
-			value = fmt.Sprintf("%d.%d.%d.%d", h.Dst[0], h.Dst[1], h.Dst[2], h.Dst[3])
+			//value = fmt.Sprintf("%d.%d.%d.%d", h.Dst[0], h.Dst[1], h.Dst[2], h.Dst[3])
+			value = ipv4String(h.Dst[:])
 		}
 		fmt.Printf("%d.IP.%s=%s\n", recNo, tag, value)
 	}
@@ -108,6 +115,58 @@ func processIP(h ip.Header, payload []byte, recNo int) (err error) {
 	Urgent     uint16
 */
 
+func processARP(h arp.Header, payload []byte, recNo int) (err error) {
+	for _, tag := range param.ARP {
+		var value string
+		switch tag {
+		case "HType":
+			value = fmt.Sprintf("%d", h.HType)
+		case "PType":
+			value = fmt.Sprintf("%d", h.PType)
+		case "HLen":
+			value = fmt.Sprintf("%d", h.HLen)
+		case "PLen":
+			value = fmt.Sprintf("%d", h.PLen)
+		case "Operation":
+			value = fmt.Sprintf("%d", h.Operation)
+		case "Sha":
+			if h.HType == 1 {
+				value = macString(h.Sha)
+			} else {
+				value = hex(h.Sha)
+			}
+		case "Tha":
+			if h.HType == 1 {
+				value = macString(h.Tha)
+			} else {
+				value = hex(h.Tha)
+			}
+		case "Spa":
+			if h.PType == 0x0800 {
+				value = ipv4String(h.Spa)
+			} else {
+				value = hex(h.Spa)
+			}
+		case "Tpa":
+			if h.PType == 0x0800 {
+				value = ipv4String(h.Tpa)
+			} else {
+				value = hex(h.Tpa)
+			}
+		}
+		fmt.Printf("%d.ARP.%s=%s\n", recNo, tag, value)
+	}
+	return
+}
+
+func macString(addr []byte) string {
+	return fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5])
+}
+
+func ipv4String(addr []byte) string {
+	return fmt.Sprintf("%d.%d.%d.%d", addr[0], addr[1], addr[2], addr[3])
+}
+
 func processTCP(h tcp.Header, payload []byte, recNo int) (err error) {
 	for _, tag := range param.TCP {
 		var value string
@@ -121,8 +180,10 @@ func processTCP(h tcp.Header, payload []byte, recNo int) (err error) {
 		case "AckNo":
 			value = fmt.Sprintf("%d", h.AckNo)
 		case "DataOffset":
-			dataOffset := ((h.DataOffset) >> 4) * 4
+			dataOffset := (h.DataOffset) >> 4
 			value = fmt.Sprintf("%d", dataOffset)
+		case "HeaderLen":
+			value = fmt.Sprintf("%d", h.HeaderLen)
 		case "WindowSize":
 			value = fmt.Sprintf("%d", h.WindowSize)
 		case "Checksum":
@@ -130,23 +191,49 @@ func processTCP(h tcp.Header, payload []byte, recNo int) (err error) {
 		case "Urgent":
 			value = fmt.Sprintf("%d", h.Urgent)
 		case "URG":
-			value = fmt.Sprintf("%d", (h.Flags&0x20)>>5)
+			value = "0"
+			if h.URG {
+				value = "1"
+			}
+			//value = fmt.Sprintf("%d", (h.Flags&0x20)>>5)
 		case "ACK":
-			value = fmt.Sprintf("%d", (h.Flags&0x10)>>4)
+			value = "0"
+			if h.ACK {
+				value = "1"
+			}
+			//value = fmt.Sprintf("%d", (h.Flags&0x10)>>4)
 		case "PSH":
-			value = fmt.Sprintf("%d", (h.Flags&0x08)>>3)
+			value = "0"
+			if h.PSH {
+				value = "1"
+			}
+			//value = fmt.Sprintf("%d", (h.Flags&0x08)>>3)
 		case "RST":
-			value = fmt.Sprintf("%d", (h.Flags&0x04)>>2)
+			value = "0"
+			if h.RST {
+				value = "1"
+			}
+			//value = fmt.Sprintf("%d", (h.Flags&0x04)>>2)
 		case "SYN":
-			value = fmt.Sprintf("%d", (h.Flags&0x02)>>1)
+			value = "0"
+			if h.SYN {
+				value = "1"
+			}
+			//value = fmt.Sprintf("%d", (h.Flags&0x02)>>1)
 		case "FIN":
-			value = fmt.Sprintf("%d", h.Flags&0x01)
+			value = "0"
+			if h.FIN {
+				value = "1"
+			}
+			//value = fmt.Sprintf("%d", h.Flags&0x01)
 		case "Options":
-			dataOffset := ((h.DataOffset) >> 4) * 4
-			value = hex(payload[0 : dataOffset-20])
+			value = hex(h.Options)
+			//dataOffset := ((h.DataOffset) >> 4) * 4
+			//value = hex(payload[0 : dataOffset-20])
 		case "Payload":
-			dataOffset := ((h.DataOffset) >> 4) * 4
-			payload = payload[dataOffset-20:]
+			//dataOffset := ((h.DataOffset) >> 4) * 4
+			//payload = payload[dataOffset-20:]
+			//payload = payload[h.HeaderLen:]
 			till := len(payload)
 			if till > 0 {
 				postfix := ""
@@ -234,7 +321,13 @@ func saveFile(filePath string, bb []byte) (err error) {
 	if err != nil {
 		return
 	}
-	defer w.Close()
+	defer func() {
+		e := w.Close()
+		if err == nil {
+			err = e
+		}
+	}()
+
 	_, err = w.Write(bb)
 	return
 }
